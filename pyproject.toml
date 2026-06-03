@@ -1,0 +1,29 @@
+[project]
+name = "transaction-data"
+version = "0.1.0"
+description = "Streaming banking transaction data platform built with AWS, Apache Iceberg, Spark and Terraform"
+authors = [
+    {name = "yuezz"}
+]
+license = "MIT"
+requires-python = ">=3.11,<4.0"
+dependencies = [
+    "rich (>=14.0.0,<15.0.0)",
+    "pyiceberg (>=0.11.1,<0.12.0)",
+    "boto3 (>=1.43.21,<2.0.0)",
+    "pandas (>=2.3.0,<3.0.0)",
+    "pyspark (==3.5.1)",
+    "python-dotenv (>=1.2.2,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pytest (>=9.0.3,<10.0.0)",
+    "ruff (>=0.15.15,<0.16.0)",
+    "mypy (>=2.1.0,<3.0.0)"
+]

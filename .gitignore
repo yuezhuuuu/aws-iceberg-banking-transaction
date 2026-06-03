@@ -1,0 +1,30 @@
+archive
+.env
+append_daily.py
+
+
+# Python
+.aws_venv/
+__pycache__/
+*.pyc
+.venv/
+
+# Credentials
+credentials.json
+.env
+.aws/
+
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform/
+*.tfstate.*
+crash.log
+
+# IDE
+.vscode/
+
+# Mac
+.DS_Store
