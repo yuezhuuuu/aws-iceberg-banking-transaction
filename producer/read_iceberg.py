@@ -4,24 +4,32 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from pyspark.sql import SparkSession
+from config.config import Config
+
 
 # load .env file
-env_path = Path(__file__).parent.parent / '.env'
+env_path = Path(__file__).parent.parent / 'config' / '.dev.env'
 load_dotenv(env_path)
 
 # ============================================
 # configuration
 # ============================================
-WAREHOUSE_PATH = "s3://banking-iceberg-data-20260601/warehouse"
-AWS_REGION = "eu-central-1"
+BUCKET_NAME = Config.BUCKET_NAME
+AWS_REGION = Config.AWS_REGION
+AWS_ACCESS_KEY = Config.AWS_ACCESS_KEY_ID
+AWS_SECRET_KEY = Config.AWS_SECRET_ACCESS_KEY
+DATABASE_NAME = Config.DATABASE_NAME
+TABLE_NAME = Config.TABLE_NAME
 
-# get credentials from environment variables
-AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID")
-AWS_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+WAREHOUSE_PATH = f"s3://{BUCKET_NAME}/warehouse"
+
 
 print("=" * 70)
 print("📖 Reading Iceberg Table from S3")
 print("=" * 70)
+print(f"Database: {DATABASE_NAME}")
+print(f"Table: {TABLE_NAME}")
 print(f"Warehouse: {WAREHOUSE_PATH}")
 print(f"AWS Region: {AWS_REGION}")
 print(f"AWS Access Key: {AWS_ACCESS_KEY[:10] if AWS_ACCESS_KEY else 'NOT SET'}...")
@@ -34,7 +42,6 @@ if not AWS_ACCESS_KEY or not AWS_SECRET_KEY:
     print("  AWS_SECRET_ACCESS_KEY=...")
     exit(1)
 
-from pyspark.sql import SparkSession
 
 # ============================================
 # reate Spark session with correct credentials
@@ -42,8 +49,9 @@ from pyspark.sql import SparkSession
 print("\n🔧 Creating Spark session...")
 
 packages = [
-    "org.apache.iceberg:iceberg-spark-runtime-3.4_2.12:1.4.3",
-    "org.apache.iceberg:iceberg-aws-bundle:1.4.3"
+    "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.2",
+    "org.apache.iceberg:iceberg-aws-bundle:1.5.2",
+    "org.apache.hadoop:hadoop-aws:3.3.4"
 ]
 
 # use hadoop configuration for credentials
@@ -70,7 +78,7 @@ print("\n📖 Reading Iceberg table...")
 
 try:
     # replace with your actual catalog, database, and table name
-    df = spark.table("my_catalog.transaction_db.txn_logs")
+    df = spark.table(f"my_catalog.{DATABASE_NAME}.{TABLE_NAME}")
     
     # show basic info
     print("\n📊 Table Info:")
@@ -120,23 +128,21 @@ print("✅ Done!")
 print("=" * 70)
 
 
-spark.sql("SELECT * FROM my_catalog.transaction_db.txn_logs.history").show()  # 确保 Spark 会话正常工作
-spark.sql("SELECT * FROM my_catalog.transaction_db.txn_logs.snapshots").show()
+spark.sql(f"SELECT * FROM my_catalog.{DATABASE_NAME}.{TABLE_NAME}.history").show()  # 确保 Spark 会话正常工作
+spark.sql(f"SELECT * FROM my_catalog.{DATABASE_NAME}.{TABLE_NAME}.snapshots").show()
 
 print("\n📋 Table Properties:")
-spark.sql("""
-    SHOW TBLPROPERTIES my_catalog.transaction_db.txn_logs
+spark.sql(f"""
+    SHOW TBLPROPERTIES my_catalog.{DATABASE_NAME}.{TABLE_NAME}
 """).show(truncate=False)
 
 # files table
 print("\n📁 File Level Information:")
-spark.sql("SELECT * FROM my_catalog.transaction_db.txn_logs.files").show()
+spark.sql(f"SELECT * FROM my_catalog.{DATABASE_NAME}.{TABLE_NAME}.files").show()
 
 # partitions table
 print("\n📐 Partition Information:")
-spark.sql("SELECT * FROM my_catalog.transaction_db.txn_logs.partitions").show()
-
-
+spark.sql(f"SELECT * FROM my_catalog.{DATABASE_NAME}.{TABLE_NAME}.partitions").show()
 
 
 spark.stop()

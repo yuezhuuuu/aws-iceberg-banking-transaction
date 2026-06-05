@@ -1,0 +1,29 @@
+{
+  "files": {
+    "/Users/yuezhu/Desktop/Study/iceberg/aws_iceberg_banking_transation/data/transactions/2026-06-05/transactions_20260605T144657_f29149b4.jsonl": {
+      "size": 12064933,
+      "mtime": 1780670877.5988545,
+      "ingested_at": "2026-06-05T14:51:28.988220+00:00"
+    },
+    "/Users/yuezhu/Desktop/Study/iceberg/aws_iceberg_banking_transation/data/transactions/2026-06-05/transactions_20260605T144557_b32b559b.jsonl": {
+      "size": 12062155,
+      "mtime": 1780670817.59714,
+      "ingested_at": "2026-06-05T14:51:28.988220+00:00"
+    },
+    "/Users/yuezhu/Desktop/Study/iceberg/aws_iceberg_banking_transation/data/transactions/2026-06-05/transactions_20260605T144457_60ad9a53.jsonl": {
+      "size": 12062927,
+      "mtime": 1780670757.595074,
+      "ingested_at": "2026-06-05T14:51:28.988220+00:00"
+    },
+    "/Users/yuezhu/Desktop/Study/iceberg/aws_iceberg_banking_transation/data/transactions/2026-06-05/transactions_20260605T144757_bf2f2df0.jsonl": {
+      "size": 12058041,
+      "mtime": 1780670937.5926895,
+      "ingested_at": "2026-06-05T14:51:28.988220+00:00"
+    },
+    "/Users/yuezhu/Desktop/Study/iceberg/aws_iceberg_banking_transation/data/transactions/2026-06-05/transactions_20260605T144357_66c0c226.jsonl": {
+      "size": 12063305,
+      "mtime": 1780670697.5907574,
+      "ingested_at": "2026-06-05T14:51:28.988220+00:00"
+    }
+  }
+}

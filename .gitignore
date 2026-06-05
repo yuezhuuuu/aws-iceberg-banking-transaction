@@ -11,8 +11,13 @@ __pycache__/
 
 # Credentials
 credentials.json
-.env
 .aws/
+
+# Environment files
+config/.dev.env
+config/.prod.env
+.env
+.env.*
 
 
 # Terraform

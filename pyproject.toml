@@ -13,7 +13,8 @@ dependencies = [
     "boto3 (>=1.43.21,<2.0.0)",
     "pandas (>=2.3.0,<3.0.0)",
     "pyspark (==3.5.1)",
-    "python-dotenv (>=1.2.2,<2.0.0)"
+    "python-dotenv (>=1.2.2,<2.0.0)",
+    "faker (>=40.21.0,<41.0.0)"
 ]
 
 

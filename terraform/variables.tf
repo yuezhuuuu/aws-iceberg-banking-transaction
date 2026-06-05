@@ -6,31 +6,42 @@ variable "aws_region" {
   default     = "eu-central-1"
 }
 
+variable "project_name" {
+  description = "Project name for tagging"
+  type        = string
+  default     = "banking-transaction-platform"
+}
+
 variable "bucket_name" {
   description = "S3 Table Bucket name (must be globally unique)"
   type        = string
 }
 
-variable "namespace_name" {
-  description = "Namespace name (like database name)"
+# variable "namespace_name" {
+#   description = "Namespace name (like database name)"
+#   type        = string
+#   # default     = "transaction_db"
+# }
+
+variable "glue_database_name" {
+  description = "Glue catalog database name"
   type        = string
-  default     = "transaction_db"
 }
 
-variable "table_name" {
-  description = "Iceberg table name"
-  type        = string
-  default     = "txn_logs"
-}
+# variable "table_name" {
+#   description = "Iceberg table name"
+#   type        = string
+#   # default     = "txn_logs"
+# }
 
 variable "environment" {
   description = "Environment name (dev, staging, prod)"
   type        = string
-  default     = "dev"
+  # default     = "dev"
 }
 
 variable "create_analyst_user" {
   description = "Whether to create a read-only analyst user"
   type        = bool
-  default     = false
+  # default     = false
 }
