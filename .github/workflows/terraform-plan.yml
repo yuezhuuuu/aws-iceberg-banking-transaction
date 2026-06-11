@@ -1,0 +1,170 @@
+name: CI — Lint, Test & Terraform Plan
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+jobs:
+  # ─────────────────────────────────────────
+  # 1. Security: block commits with raw AWS keys
+  # ─────────────────────────────────────────
+  security-scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for hardcoded AWS credentials
+        run: |
+          if git log origin/${{ github.base_ref }}..HEAD \
+               --diff-filter=A -p -- \
+               '*.py' '*.tf' '*.yaml' '*.yml' '*.json' \
+             | grep -E 'AKIA[A-Z0-9]{16}'; then
+            echo "❌ AWS Access Key ID found in diff — remove it before merging."
+            exit 1
+          fi
+          if git log origin/${{ github.base_ref }}..HEAD \
+               --diff-filter=A -p -- \
+               '*.py' '*.tf' '*.yaml' '*.yml' \
+             | grep -E 'AWS_SECRET_ACCESS_KEY\s*=\s*[A-Za-z0-9+/]{40}'; then
+            echo "❌ AWS Secret Access Key found in diff — remove it before merging."
+            exit 1
+          fi
+          echo "✅ No hardcoded credentials detected."
+
+  # ─────────────────────────────────────────
+  # 2. Python: lint + type-check
+  # ─────────────────────────────────────────
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: pip install poetry==2.1.3
+
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+
+      - name: Install dependencies
+        run: poetry install --with dev
+
+      - name: Ruff — lint
+        run: poetry run ruff check .
+
+      - name: Ruff — format check
+        run: poetry run ruff format --check .
+
+      - name: Mypy — type check
+        run: poetry run mypy producer/ config/
+
+  # ─────────────────────────────────────────
+  # 3. Python: unit tests
+  # ─────────────────────────────────────────
+  test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: [lint]
+    env:
+      ENV: test
+      OUTPUT_DIR: /tmp/test-transactions
+      TARGET_TPS: "10"
+      ROTATE_SECONDS: "60"
+      ROTATE_SIZE_MB: "64"
+      DURATION_SECONDS: "5"
+      BUCKET_NAME: test-bucket
+      GLUE_DATABASE_NAME: test_db
+      TABLE_NAME: transaction_logs
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: pip install poetry==2.1.3
+
+      - name: Cache Poetry virtualenv
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('poetry.lock') }}
+
+      - name: Install dependencies
+        run: poetry install --with dev
+
+      - name: Run pytest
+        run: poetry run pytest --tb=short -v
+
+  # ─────────────────────────────────────────
+  # 4. Terraform: fmt + validate + plan
+  #    Uses dev.tfvars for PRs → develop
+  #    Uses prod.tfvars for PRs → main
+  # ─────────────────────────────────────────
+  terraform-plan:
+    name: Terraform Plan (${{ github.base_ref }})
+    runs-on: ubuntu-latest
+    needs: [security-scan]
+    defaults:
+      run:
+        working-directory: terraform
+    env:
+      AWS_DEFAULT_REGION: eu-central-1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '~1.10'
+
+      - name: Configure AWS credentials (dev)
+        if: github.base_ref == 'develop'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: Configure AWS credentials (prod)
+        if: github.base_ref == 'main'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.PROD_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.PROD_AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-central-1
+
+      - name: Terraform Init (dev)
+        if: github.base_ref == 'develop'
+        run: terraform init -backend-config=backend-dev.hcl
+
+      - name: Terraform Init (prod)
+        if: github.base_ref == 'main'
+        run: terraform init -backend-config=backend-prod.hcl
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan (dev)
+        if: github.base_ref == 'develop'
+        run: terraform plan -var-file=dev.tfvars -no-color
+        continue-on-error: false
+
+      - name: Terraform Plan (prod)
+        if: github.base_ref == 'main'
+        run: terraform plan -var-file=prod.tfvars -no-color
+        continue-on-error: false

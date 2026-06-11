@@ -24,9 +24,9 @@ config/.prod.env
 .terraform/
 *.tfstate
 *.tfstate.backup
-.terraform/
 *.tfstate.*
 crash.log
+terraform/bootstrap/.terraform/
 
 # IDE
 .vscode/

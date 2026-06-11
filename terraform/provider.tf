@@ -12,12 +12,10 @@ terraform {
     }
   }
 
-  # if you want to use remote state storage, uncomment the following block and configure it with your S3 bucket details
-  # backend "s3" {
-  #   bucket = "your-terraform-state-bucket"
-  #   key    = "banking-streaming/terraform.tfstate"
-  #   region = "eu-central-1"
-  # }
+  # Partial backend config — bucket/key/region are supplied at init time via:
+  #   terraform init -backend-config=backend-dev.hcl   (dev)
+  #   terraform init -backend-config=backend-prod.hcl  (prod)
+  backend "s3" {}
 }
 
 provider "aws" {
