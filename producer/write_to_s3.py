@@ -10,29 +10,36 @@ Key behaviors:
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+
 from dotenv import load_dotenv
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, current_timestamp, days, from_unixtime
 from pyspark.sql.types import TimestampType
-
-from config.config import Config
 
 
 # ============================================
 # CLI / configuration
 # ============================================
 parser = argparse.ArgumentParser()
-parser.add_argument("--env", default="dev", choices=["dev", "prod"])
+parser.add_argument("--env", default=os.getenv("ENV", "dev"), choices=["dev", "prod"])
 args = parser.parse_args()
 
+os.environ["ENV"] = args.env
+
 ENV_FILE = Path(__file__).resolve().parent.parent / "config" / f".{args.env}.env"
-load_dotenv(ENV_FILE)
+load_dotenv(ENV_FILE, override=True)
 # CLI examples:
 #   poetry run python producer/write_to_s3.py --env dev
 #   poetry run python producer/write_to_s3.py --env prod
+
+from config.config import Config
+
+
+Config.validate()
 
 BUCKET_NAME = Config.BUCKET_NAME
 DATABASE_NAME = Config.DATABASE_NAME
@@ -45,7 +52,9 @@ TABLE_ID = f"my_catalog.{DATABASE_NAME}.{TABLE_NAME}"
 # Local source JSONL files
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = PROJECT_ROOT / "data" / "transactions"
+DATA_DIR = Path(Config.OUTPUT_DIR)
+if not DATA_DIR.is_absolute():
+    DATA_DIR = PROJECT_ROOT / DATA_DIR
 
 print(DATA_DIR)
 

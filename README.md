@@ -34,18 +34,31 @@ aws-iceberg-banking-transaction/
 │   ├── .dev.env               # Dev credentials (git-ignored)
 │   └── .prod.env              # Prod credentials (git-ignored)
 ├── terraform/
-│   ├── main.tf                # S3, Glue, IAM resources
+│   ├── main.tf                # Root module — calls storage, catalog, iam modules
 │   ├── provider.tf            # AWS provider + S3 remote backend
 │   ├── variables.tf
 │   ├── locals.tf
-│   ├── output.tf
+│   ├── output.tf              # Aggregates outputs from all modules
 │   ├── dev.tfvars
 │   ├── prod.tfvars
 │   ├── backend-dev.hcl        # Remote state config for dev
 │   ├── backend-prod.hcl       # Remote state config for prod
+│   ├── modules/
+│   │   ├── storage/           # S3 bucket (via terraform-aws-modules/s3-bucket/aws)
+│   │   │   ├── main.tf
+│   │   │   ├── variables.tf
+│   │   │   └── outputs.tf
+│   │   ├── catalog/           # Glue catalog database (raw resource)
+│   │   │   ├── main.tf
+│   │   │   ├── variable.tf
+│   │   │   └── output.tf
+│   │   └── iam/               # IAM user + policy (via terraform-aws-modules/iam/aws)
+│   │       ├── main.tf
+│   │       ├── variables.tf
+│   │       └── output.tf
 │   └── bootstrap/
-│       └── main.tf            # One-time: creates state S3 bucket + DynamoDB lock table,
-│                              # name is banking-transaction-platform-20260601-state
+│       └── main.tf            # One-time: creates state S3 bucket + DynamoDB lock table
+│                              # bucket: banking-transaction-platform-20260601-state
 └── .github/
     └── workflows/
         ├── terraform-plan.yml # CI: runs on every PR
@@ -221,6 +234,67 @@ verify-prod
 
 ---
 
+## Terraform Modules
+
+Infrastructure is split into three child modules. The root `main.tf` calls all three, passing variables from the active `.tfvars` file.
+
+```
+dev.tfvars / prod.tfvars
+        │ variables
+        ▼
+   root main.tf
+   ├── module "storage"  →  modules/storage/  →  terraform-aws-modules/s3-bucket/aws ~> 4.0
+   ├── module "catalog"  →  modules/catalog/  →  raw aws_glue_catalog_database resource
+   └── module "iam"      →  modules/iam/      →  terraform-aws-modules/iam/aws ~> 5.0
+                                                   ├── //modules/iam-policy
+                                                   └── //modules/iam-user
+        │ outputs
+        ▼
+   root output.tf
+```
+
+### Module responsibilities
+
+| Module | Registry source | Resources managed |
+|---|---|---|
+| `storage` | `terraform-aws-modules/s3-bucket/aws` | S3 bucket, versioning, SSE, public access block, lifecycle rule |
+| `catalog` | raw resource | `aws_glue_catalog_database` |
+| `iam` | `terraform-aws-modules/iam/aws` | IAM policy (Spark S3+Glue access), IAM user, policy attachment |
+
+### Why tags are not passed to modules
+
+`provider.tf` uses `default_tags` which automatically applies to every resource created by the AWS provider, including resources inside child modules. Tags do not need to be passed as module inputs.
+
+### Migrating existing state after module refactor
+
+If resources were previously created with the flat structure (before modules), use `terraform state mv` to remap addresses without destroying infrastructure:
+
+```bash
+terraform state mv \
+  'aws_s3_bucket.banking' \
+  'module.storage.module.s3_bucket.aws_s3_bucket.this[0]'
+
+terraform state mv \
+  'aws_glue_catalog_database.banking' \
+  'module.catalog.aws_glue_catalog_database.this'
+
+terraform state mv \
+  'aws_iam_policy.spark_access' \
+  'module.iam.module.spark_policy.aws_iam_policy.policy[0]'
+
+terraform state mv \
+  'aws_iam_user.spark_user' \
+  'module.iam.module.spark_user.aws_iam_user.this[0]'
+
+terraform state mv \
+  'aws_iam_user_policy_attachment.spark_s3_access_attach' \
+  'module.iam.module.spark_user.aws_iam_user_policy_attachment.this["0"]'
+```
+
+After all `state mv` commands, re-run `terraform plan -var-file=dev.tfvars` and confirm there are **no destroy actions** before applying.
+
+---
+
 ## Terraform Remote State
 
 State files are stored in S3 with DynamoDB locking to prevent concurrent applies.
@@ -230,14 +304,14 @@ State files are stored in S3 with DynamoDB locking to prevent concurrent applies
 | dev | `banking-transaction/dev/terraform.tfstate` |
 | prod | `banking-transaction/prod/terraform.tfstate` |
 
-Both use the same S3 bucket (`banking-tf-state-20260601`) and DynamoDB table (`banking-tf-locks`).
+Both use the same S3 bucket (`banking-transaction-platform-20260601-state`) and DynamoDB table (`banking-tf-locks`).
 
 ### One-time bootstrap (run once before anything else)
 
 ```bash
 cd terraform/bootstrap
 terraform init
-terraform apply -var="state_bucket_name=banking-tf-state-20260601"
+terraform apply -var="state_bucket_name=banking-transaction-platform-20260601-state"
 ```
 
 ### Migrate existing local state to S3
