@@ -36,7 +36,7 @@ load_dotenv(ENV_FILE, override=True)
 #   poetry run python producer/write_to_s3.py --env dev
 #   poetry run python producer/write_to_s3.py --env prod
 
-from config.config import Config
+from config.config import Config  # noqa: E402
 
 
 Config.validate()
@@ -109,7 +109,9 @@ all_files = [f for f in DATA_DIR.rglob("*.jsonl") if f.stat().st_size > 0]
 # which is the standard pattern for append-only JSONL drops.
 new_files = [f for f in all_files if str(f.resolve()) not in processed]
 
-print(f"📂 Total files: {len(all_files)} | already ingested: {len(processed)} | new: {len(new_files)}")
+print(
+    f"📂 Total files: {len(all_files)} | already ingested: {len(processed)} | new: {len(new_files)}"
+)
 
 if not new_files:
     print("✅ No new files to ingest. Nothing to do.")
@@ -137,11 +139,19 @@ packages = [
 spark = (
     SparkSession.builder.appName("S3 Iceberg Writer")
     .config("spark.jars.packages", ",".join(packages))
-    .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
+    .config(
+        "spark.sql.extensions",
+        "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+    )
     .config("spark.sql.catalog.my_catalog", "org.apache.iceberg.spark.SparkCatalog")
-    .config("spark.sql.catalog.my_catalog.catalog-impl", "org.apache.iceberg.aws.glue.GlueCatalog")
+    .config(
+        "spark.sql.catalog.my_catalog.catalog-impl",
+        "org.apache.iceberg.aws.glue.GlueCatalog",
+    )
     .config("spark.sql.catalog.my_catalog.warehouse", WAREHOUSE_PATH)
-    .config("spark.sql.catalog.my_catalog.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+    .config(
+        "spark.sql.catalog.my_catalog.io-impl", "org.apache.iceberg.aws.s3.S3FileIO"
+    )
     .config("spark.sql.catalog.my_catalog.client.region", AWS_REGION)
     .getOrCreate()
 )
@@ -154,7 +164,9 @@ print("✅ Spark session created")
 # Read ONLY the new files
 # ============================================
 print("\n📖 Reading new JSONL files...")
-df = spark.read.json([str(f) for f in new_files])  # Spark reads multiple paths in one shot
+df = spark.read.json(
+    [str(f) for f in new_files]
+)  # Spark reads multiple paths in one shot
 record_count = df.count()
 print(f"   Records in this batch: {record_count:,}")
 
@@ -163,7 +175,11 @@ if record_count == 0:
     now = datetime.now(timezone.utc).isoformat()
     for f in new_files:
         st = f.stat()
-        processed[str(f.resolve())] = {"size": st.st_size, "mtime": st.st_mtime, "ingested_at": now}
+        processed[str(f.resolve())] = {
+            "size": st.st_size,
+            "mtime": st.st_mtime,
+            "ingested_at": now,
+        }
     save_state(STATE_FILE, state)
     spark.stop()
     sys.exit(0)
@@ -176,14 +192,26 @@ print("\n🔄 Transforming data...")
 
 # Derive a single event_time column; partitioning is handled by Iceberg, not extra columns.
 if "timestamp_ms" in df.columns:
-    df = df.withColumn("event_time", from_unixtime(col("timestamp_ms") / 1000).cast(TimestampType()))
+    df = df.withColumn(
+        "event_time", from_unixtime(col("timestamp_ms") / 1000).cast(TimestampType())
+    )
 else:
     df = df.withColumn("event_time", current_timestamp())
 
 desired_columns = [
-    "transaction_id", "account_id", "account_type", "amount", "currency",
-    "transaction_type", "status", "event_time", "merchant_name",
-    "merchant_category", "location_city", "location_country", "channel",
+    "transaction_id",
+    "account_id",
+    "account_type",
+    "amount",
+    "currency",
+    "transaction_type",
+    "status",
+    "event_time",
+    "merchant_name",
+    "merchant_category",
+    "location_city",
+    "location_country",
+    "channel",
     "risk_score",
 ]
 existing_columns = [c for c in desired_columns if c in df.columns]
@@ -214,7 +242,9 @@ try:
         # First run: create the table with Iceberg hidden partitioning.
         # days(event_time) => one partition per day, with automatic partition pruning.
         # Use months(event_time) instead if daily partitions are too fine-grained.
-        df.writeTo(TABLE_ID).using("iceberg").partitionedBy(days(col("event_time"))).create()
+        df.writeTo(TABLE_ID).using("iceberg").partitionedBy(
+            days(col("event_time"))
+        ).create()
         print("✅ Created table and wrote first batch")
 
 except Exception as e:
@@ -229,7 +259,11 @@ except Exception as e:
 now = datetime.now(timezone.utc).isoformat()
 for f in new_files:
     st = f.stat()
-    processed[str(f.resolve())] = {"size": st.st_size, "mtime": st.st_mtime, "ingested_at": now}
+    processed[str(f.resolve())] = {
+        "size": st.st_size,
+        "mtime": st.st_mtime,
+        "ingested_at": now,
+    }
 save_state(STATE_FILE, state)
 print(f"📝 State updated: {len(new_files)} files marked as ingested")
 

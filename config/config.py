@@ -13,7 +13,6 @@ load_dotenv(ENV_FILE)
 
 
 class Config:
-
     # AWS
     AWS_REGION = os.getenv("AWS_REGION")
     AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
