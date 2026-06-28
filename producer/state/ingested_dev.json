@@ -24,6 +24,11 @@
       "size": 12063305,
       "mtime": 1780670697.5907574,
       "ingested_at": "2026-06-05T14:51:28.988220+00:00"
+    },
+    "/Users/yuezhu/Desktop/Study/iceberg/aws_iceberg_banking_transation/data/transactions/2026-06-12/transactions_20260612T151737_3728ebfc.jsonl": {
+      "size": 6029613,
+      "mtime": 1781277487.6417787,
+      "ingested_at": "2026-06-12T15:20:56.707980+00:00"
     }
   }
 }

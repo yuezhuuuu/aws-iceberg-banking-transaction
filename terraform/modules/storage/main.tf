@@ -1,5 +1,5 @@
 module "s3_bucket" {
-  source = "terraform-aws-modules/s3-bucket/aws"
+  source  = "terraform-aws-modules/s3-bucket/aws"
   version = "~> 4.0"
 
   bucket = var.bucket_name
@@ -26,7 +26,7 @@ module "s3_bucket" {
     id      = "expire-old-objects"
     enabled = true
 
-    expiration ={
+    expiration = {
       days = 365
     }
   }]

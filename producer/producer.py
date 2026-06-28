@@ -17,7 +17,7 @@ Changes vs the original:
 import os
 import time
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, TextIO
 from uuid import uuid4
 
 from config.config import Config
@@ -33,18 +33,18 @@ class TransactionProducer:
 
         # statistics
         self.total_sent = 0
-        self.start_time = None
+        self.start_time: Optional[float] = None
 
         # output file handle and path
-        self.current_file = None
-        self.current_file_path = None
+        self.current_file: Optional[TextIO] = None
+        self.current_file_path: Optional[str] = None
         self.current_file_size = 0
-        self.last_rotate_time = None
+        self.last_rotate_time: Optional[float] = None
 
         # flush policy: bound the data-loss window on a hard crash without
         # paying a flush() syscall on every single record.
         # Optional Config knobs (sensible defaults if absent).
-        self.flush_every = getattr(config, "FLUSH_EVERY", 200)              # records
+        self.flush_every = getattr(config, "FLUSH_EVERY", 200)  # records
         self.flush_interval = getattr(config, "FLUSH_INTERVAL_SECONDS", 1.0)  # seconds
         self._records_since_flush = 0
         self._last_flush_time = time.time()
@@ -89,6 +89,9 @@ class TransactionProducer:
 
     def _should_rotate(self) -> bool:
         """Rotate on time threshold, size threshold, or date (UTC) rollover."""
+        assert self.last_rotate_time is not None
+        assert self.current_file_path is not None
+
         # time threshold
         if time.time() - self.last_rotate_time >= self.config.ROTATE_SECONDS:
             return True
@@ -108,6 +111,7 @@ class TransactionProducer:
             or self._records_since_flush >= self.flush_every
             or (now - self._last_flush_time) >= self.flush_interval
         ):
+            assert self.current_file is not None
             self.current_file.flush()
             self._records_since_flush = 0
             self._last_flush_time = now
@@ -118,6 +122,7 @@ class TransactionProducer:
             if self._should_rotate():
                 self._open_new_file()
 
+            assert self.current_file is not None
             line = transaction.to_json() + "\n"
             self.current_file.write(line)
 
@@ -137,7 +142,8 @@ class TransactionProducer:
         Args:
             duration_seconds: how long to run (seconds); None runs until Ctrl+C.
         """
-        self.start_time = time.time()
+        start_time = time.time()
+        self.start_time = start_time
         target_tps = self.config.TARGET_TPS
 
         print("=" * 60)
@@ -145,7 +151,9 @@ class TransactionProducer:
         print("=" * 60)
         print(f"   Target TPS : {target_tps} rec/s")
         print(f"   Output dir : {self.config.OUTPUT_DIR}")
-        print(f"   Rotate by  : {self.config.ROTATE_SECONDS}s or {self.config.ROTATE_SIZE_MB}MB")
+        print(
+            f"   Rotate by  : {self.config.ROTATE_SECONDS}s or {self.config.ROTATE_SIZE_MB}MB"
+        )
         print(f"   Flush every: {self.flush_every} rec or {self.flush_interval}s")
         print("=" * 60)
         print()
@@ -155,14 +163,14 @@ class TransactionProducer:
 
         try:
             while True:
-                if duration_seconds and (time.time() - self.start_time) > duration_seconds:
+                if duration_seconds and (time.time() - start_time) > duration_seconds:
                     break
 
                 transaction = self.generator.generate_transaction()
                 self._write_transaction(transaction)
 
                 # cumulative rate control: keep actual throughput near target_tps
-                elapsed = time.time() - self.start_time
+                elapsed = time.time() - start_time
                 expected = self.total_sent / target_tps
                 if elapsed < expected:
                     time.sleep(expected - elapsed)
@@ -170,7 +178,10 @@ class TransactionProducer:
                 # rate report once per second
                 now = time.time()
                 if now - last_report_time >= 1.0:
-                    actual_rate = (self.total_sent - last_report_count) / (now - last_report_time)
+                    actual_rate = (self.total_sent - last_report_count) / (
+                        now - last_report_time
+                    )
+                    assert self.current_file_path is not None
                     print(
                         f"📊 Rate: {actual_rate:.1f} rec/s | Total: {self.total_sent} | "
                         f"File: {os.path.basename(self.current_file_path)} | "
@@ -186,7 +197,7 @@ class TransactionProducer:
             if self.current_file:
                 self.current_file.close()
 
-            elapsed = time.time() - self.start_time if self.start_time else 0
+            elapsed = time.time() - start_time
             avg_rate = self.total_sent / elapsed if elapsed > 0 else 0
 
             print("\n" + "=" * 60)
@@ -226,7 +237,11 @@ def main():
         return
 
     producer = TransactionProducer(config)
-    producer.run(duration_seconds=Config.DURATION_SECONDS if Config.DURATION_SECONDS > 0 else None)
+    producer.run(
+        duration_seconds=Config.DURATION_SECONDS
+        if Config.DURATION_SECONDS > 0
+        else None
+    )
 
 
 if __name__ == "__main__":
